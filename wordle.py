@@ -37,7 +37,7 @@ def download_wordlist(url: str, wordlen: int) -> list:
 def simulate_wordle(guess: str, answer: str, words: set, rankwords: Callable, guessnum: int=1) -> dict:
     mark = get_mark(guess, answer)
     words = rankwords(get_allowed_words(words, guess, mark))
-    print(guessnum, guess, len(words), words[:10])
+    print(guessnum, guess, len(words), ', '.join(words[:15]))
     guessnum = guessnum + 1
     guess = words[0]
     if guess == answer:
@@ -112,7 +112,7 @@ def order_by_position_likelihood(words: set) -> list:
 
 
 def order_by_usage_frequency(words: set, mostcommon_ordered: list) -> list:
-    mostcommonranks = {word: rank for rank, word in enumerate(mostcommon_ordered, 1)}
+    mostcommonranks = dict(enumerate(mostcommon_ordered))
     return sorted(words, key=lambda x: mostcommonranks.get(x, 1e11))
 
 
