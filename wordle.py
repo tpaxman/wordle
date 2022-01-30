@@ -54,12 +54,6 @@ def is_word_allowed(word: str, charcount_constraints: dict, position_constraints
     ))
 
 
-def is_mark_possible(mark, guess, answer):
-    charcount_constraints = calc_charcount_constraints(guess, mark)
-    position_constraints = calc_position_constraints(guess, mark)
-    return is_word_allowed(answer, charcount_constraints, position_constraints)
-
-
 def get_allowed_words(words: set, guess: str, mark: str) -> set:
     charcount_constraints = calc_charcount_constraints(guess, mark)
     position_constraints = calc_position_constraints(guess, mark)
@@ -74,7 +68,7 @@ def get_mark(guess: str, answer: str) -> str:
     candidate_marks = {m for m in mark_permutations
         if {('GREEN','GREEN'),('GREY','GREY'),('_','GREY'),('_','YELLOW')}.issuperset(zip(partialmark, m))
     }
-    ok_marks = [mark for mark in candidate_marks if is_mark_possible(mark, guess, answer)]
+    ok_marks = [mark for mark in candidate_marks if answer in get_allowed_words({answer}, guess, mark)]
     return ok_marks[0] # there can sometimes be more than one possible mark
 
 
