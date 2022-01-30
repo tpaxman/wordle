@@ -20,10 +20,12 @@ def main():
     assert set(map(len, (guess, answer))) == {WORDLEN}, "guess and answer must be five-letter words"
 
     wordle_sim_scrabble = partial(simulate_wordle, words=scrabblewords)
+
     print('\nusing character position likelihood:')
-    wordle_sim_scrabble(guess, answer, guess_ranker=order_by_position_likelihood)
+    wordle_sim_scrabble(guess, answer, rankwords=order_by_position_likelihood)
+
     print('\nusing word usage frequency:')
-    wordle_sim_scrabble(guess, answer, guess_ranker=partial(order_by_usage_frequency, mostcommon_ordered=mostcommon_ordered))
+    wordle_sim_scrabble(guess, answer, rankwords=partial(order_by_usage_frequency, mostcommon_ordered=mostcommon_ordered))
 
 
 def download_wordlist(url: str, wordlen: int=None) -> list:
@@ -34,18 +36,16 @@ def download_wordlist(url: str, wordlen: int=None) -> list:
     else:
         return wordlist
 
-
-def simulate_wordle(guess: str, answer: str, words: set, guess_ranker: Callable, guessnum: int=1) -> dict:
+def simulate_wordle(guess: str, answer: str, words: set, rankwords: Callable, guessnum: int=1) -> dict:
     mark = get_mark(guess, answer)
-    allowed_words = get_allowed_words(words, guess, mark)
-    ranked_words = guess_ranker(allowed_words)
-    print(guessnum, guess, len(ranked_words), ranked_words[:10])
+    words = rankwords(get_allowed_words(words, guess, mark))
+    print(guessnum, guess, len(words), words[:10])
     guessnum = guessnum + 1
-    nextguess = ranked_words[0]
-    if nextguess == answer:
-        print(guessnum, nextguess)
+    guess = words[0]
+    if guess == answer:
+        print(guessnum, guess)
     else:
-        return simulate_wordle(nextguess, answer, ranked_words, guess_ranker, guessnum)
+        return simulate_wordle(guess, answer, words, rankwords, guessnum)
 
 
 def get_allowed_words(words: set, guess: str, mark: list) -> set:
