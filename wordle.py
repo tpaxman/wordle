@@ -22,7 +22,7 @@ def main():
     wordle_sim_scrabble(guess, answer, guess_ranker=partial(order_by_usage_frequency, frequencies=download_common_ordered_words()))
 
 
-def calc_charcount_constraints(guess: str, mark: str) -> dict:
+def calc_charcount_constraints(guess: str, mark: list) -> dict:
 
     instances_guessed = Counter(guess)   
     instances_confirmed = Counter(g for g, m in zip(guess, mark) if m != "GREY")
@@ -30,13 +30,13 @@ def calc_charcount_constraints(guess: str, mark: str) -> dict:
     def get_allowed_charcounts(char: str) -> set:
         n_guessed = instances_guessed[char]
         n_confirmed = instances_confirmed[char]
-        n_maxpossible = n_confirmed if n_guessed > n_confirmed else len(guess)
+        n_maxpossible = n_confirmed if n_guessed > n_confirmed else WORDLEN
         return set(range(n_confirmed, n_maxpossible+1))
 
     return {char: get_allowed_charcounts(char) for char in set(guess)}
 
 
-def calc_position_constraints(guess: str, mark: str) -> dict:
+def calc_position_constraints(guess: str, mark: list) -> dict:
 
     def possible_position_chars(position: int) -> set:
         set_operation = 'intersection' if mark[position]=="GREEN" else 'difference'
@@ -44,7 +44,7 @@ def calc_position_constraints(guess: str, mark: str) -> dict:
         return set_method(guess[position])
 
     return {position: possible_position_chars(position)
-            for position in range(len(guess))}
+            for position in range(WORDLEN)}
 
 
 def is_word_allowed(word: str, charcount_constraints: dict, position_constraints: dict) -> bool:
@@ -55,7 +55,7 @@ def is_word_allowed(word: str, charcount_constraints: dict, position_constraints
     ))
 
 
-def get_allowed_words(words: set, guess: str, mark: str) -> set:
+def get_allowed_words(words: set, guess: str, mark: list) -> set:
     charcount_constraints = calc_charcount_constraints(guess, mark)
     position_constraints = calc_position_constraints(guess, mark)
     return [word for word in words if is_word_allowed(word, charcount_constraints, position_constraints)]
@@ -65,7 +65,7 @@ def get_mark(guess: str, answer: str) -> str:
     """returns a mark for a wordle guess where G = green, Y = yellow, N = grey"""
     partialmark = ["GREEN" if g == a else "GREY" if g not in answer else "_"
                    for g, a in zip(guess, answer)]
-    mark_permutations = set(product(MARKS, repeat=5))
+    mark_permutations = set(product(MARKS, repeat=WORDLEN))
     candidate_marks = {m for m in mark_permutations
         if {('GREEN','GREEN'),('GREY','GREY'),('_','GREY'),('_','YELLOW')}.issuperset(zip(partialmark, m))
     }
