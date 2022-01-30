@@ -14,11 +14,12 @@ MARKS = {"GREEN", "YELLOW", "GREY"}
 
 def main():
     guess, answer = sys.argv[1:]
-    words = download_scrabble_words()
+    assert set(map(len, (guess, answer))) == {WORDLEN}, "guess and answer must be five-letter words"
+    wordle_sim_scrabble = partial(simulate_wordle, words=download_scrabble_words())
     print('\nusing character position likelihood:')
-    simulate_wordle(guess, answer, words, guess_ranker=order_by_position_likelihood)
+    wordle_sim_scrabble(guess, answer, guess_ranker=order_by_position_likelihood)
     print('\nusing word usage frequency:')
-    simulate_wordle(guess, answer, words, guess_ranker=partial(order_by_usage_frequency, frequencies=download_common_ordered_words()))
+    wordle_sim_scrabble(guess, answer, guess_ranker=partial(order_by_usage_frequency, frequencies=download_common_ordered_words()))
 
 
 def calc_charcount_constraints(guess: str, mark: str) -> dict:
