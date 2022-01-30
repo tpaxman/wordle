@@ -1,8 +1,8 @@
 import sys
+import requests
 from collections import Counter
 from functools import partial
 from itertools import product
-import requests
 from typing import Callable
 
 # CONSTANTS
@@ -44,6 +44,7 @@ def calc_position_constraints(guess: str, mark: str) -> dict:
 
     return {position: possible_position_chars(position)
             for position in range(len(guess))}
+
 
 def is_word_allowed(word: str, charcount_constraints: dict, position_constraints: dict) -> bool:
     instances = Counter(word)
@@ -122,6 +123,7 @@ def download_common_ordered_words() -> dict:
     ordered_words = download_wordlist(WORDLIST_URL_ORDERED_BY_USAGE, WORDLEN)
     usageranks = {word: rank for rank, word in enumerate(ordered_words, 1)}
     return usageranks
+
 
 if __name__=='__main__':
     main()
