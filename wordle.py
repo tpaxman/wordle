@@ -20,6 +20,53 @@ RESULTS_SET = set("GYN")
 
 # SOURCE DATA
 def main():
+    guess, answer = sys.argv[1:]
+    scrabblewords = download_scrabble_words()
+    usageranks = download_common_ordered_words()
+
+def get_possible_char_count_sets(guess: str, mark: str) -> dict:
+
+    def possible_char_counts(char: str, guess: str, mark: str) -> set:
+        charmarks = Counter(m for c,m in zip(guess, mark) if c == char)
+        n_confirmed = charmarks['Y'] + charmarks['G']
+        n_denied = charmarks['N']
+        char_counts = NUMCHARS_SET.difference(range(n_confirmed)) if n_denied==0 else {n_confirmed}
+        return char_counts
+
+    return {char: possible_char_counts(char, guess, mark) for char in guess}
+
+
+def get_possible_position_char_sets(guess: str, mark: str) -> dict:
+
+    def possible_position_chars(position: int, guess: str, mark: str) -> set:
+        g = guess[position]
+        m = mark[position]
+        poss_chars = {g} if m == 'G' else CHARS_SET - {g}
+        return poss_chars
+
+    return {position: possible_position_chars(position, guess, mark) for position in NUMCHARS_SET}
+
+
+def mark_guess(guess: str, answer: str) -> str:
+    """returns a mark for a wordle guess where G = green, Y = yellow, N = grey"""
+    prelim = ''.join("G" if g == a else "N" if g not in answer else "_" for g, a in zip(guess, answer))
+    markcombos = {''.join(x) for x in product(*["GYN"]*5)} 
+    possible = {actual for actual in markcombos if {'GG','NN', '_N', '_Y'} >= {*map(''.join, zip(prelim, actual))})    
+
+    def is_mark_possible(mark, guess, answer):
+        charcounts = get_possible_char_count_sets(guess, mark)
+        positionchars = get_possible_position_char_sets(guess, mark)
+        has_expected_char_counts = all(count in charcounts.get(char, CHARS_SET) for char, count in Counter(answer))
+        has_expected_position_chars = all(char in positionchars.get(position) for position, char in enumerate(answer))
+        return has_expected_char_counts and has_expected_position_chars
+            
+    only_options = [mark for mark in mark_combos_possible if is_mark_possible(mark)]
+    assert len(only_options) in (1,2), f"there are {len(only_options)} marks and I don't know why:"+"\n".join(only_options)
+    selected_mark = list(only_options)[0]
+    return selected_mark
+
+
+def main2():
 
     guess, answer = sys.argv[1:]
 
