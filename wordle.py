@@ -22,6 +22,42 @@ def main():
     wordle_sim_scrabble(guess, answer, guess_ranker=partial(order_by_usage_frequency, frequencies=download_common_ordered_words()))
 
 
+def download_wordlist(url: str, wordlen: int) -> list:
+    response = requests.get(url)
+    rawtext = response.text
+    lowertext = rawtext.lower()
+    wordlist = [x.strip() for x in lowertext.split('\n') if len(x)==wordlen]
+    return wordlist
+
+
+def download_scrabble_words() -> list:
+    return download_wordlist(WORDLIST_URL_SCRABBLE, WORDLEN)
+
+
+def download_common_ordered_words() -> dict:
+    ordered_words = download_wordlist(WORDLIST_URL_ORDERED_BY_USAGE, WORDLEN)
+    usageranks = {word: rank for rank, word in enumerate(ordered_words, 1)}
+    return usageranks
+
+
+def simulate_wordle(guess: str, answer: str, words: set, guess_ranker: Callable, guessnum: int=1) -> dict:
+    mark = get_mark(guess, answer)
+    allowed_words = get_allowed_words(words, guess, mark)
+    ranked_words = guess_ranker(allowed_words)
+    next_guess = ranked_words[0]
+    print(guessnum, guess, len(ranked_words), ranked_words[:10])
+    if next_guess == answer:
+        print(guessnum+1, next_guess)
+    else:
+        return simulate_wordle(next_guess, answer, ranked_words, guess_ranker, guessnum+1)
+
+
+def get_allowed_words(words: set, guess: str, mark: list) -> set:
+    charcount_constraints = calc_charcount_constraints(guess, mark)
+    position_constraints = calc_position_constraints(guess, mark)
+    return [word for word in words if is_word_allowed(word, charcount_constraints, position_constraints)]
+
+
 def calc_charcount_constraints(guess: str, mark: list) -> dict:
 
     instances_guessed = Counter(guess)   
@@ -55,12 +91,6 @@ def is_word_allowed(word: str, charcount_constraints: dict, position_constraints
     ))
 
 
-def get_allowed_words(words: set, guess: str, mark: list) -> set:
-    charcount_constraints = calc_charcount_constraints(guess, mark)
-    position_constraints = calc_position_constraints(guess, mark)
-    return [word for word in words if is_word_allowed(word, charcount_constraints, position_constraints)]
-
-
 def get_mark(guess: str, answer: str) -> str:
     """returns a mark for a wordle guess where G = green, Y = yellow, N = grey"""
     partialmark = ["GREEN" if g == a else "GREY" if g not in answer else "_"
@@ -90,34 +120,7 @@ def order_by_usage_frequency(words: set, frequencies: dict) -> list:
     return sorted(words, key=lambda x: frequencies.get(x, 1e11))
 
 
-def simulate_wordle(guess: str, answer: str, words: set, guess_ranker: Callable, guessnum: int=1) -> dict:
-    mark = get_mark(guess, answer)
-    allowed_words = get_allowed_words(words, guess, mark)
-    ranked_words = guess_ranker(allowed_words)
-    next_guess = ranked_words[0]
-    print(guessnum, guess, len(ranked_words), ranked_words[:10])
-    if next_guess == answer:
-        print(guessnum+1, next_guess)
-    else:
-        return simulate_wordle(next_guess, answer, ranked_words, guess_ranker, guessnum+1)
 
-
-def download_wordlist(url: str, wordlen: int) -> list:
-    response = requests.get(url)
-    rawtext = response.text
-    lowertext = rawtext.lower()
-    wordlist = [x.strip() for x in lowertext.split('\n') if len(x)==wordlen]
-    return wordlist
-
-
-def download_scrabble_words() -> list:
-    return download_wordlist(WORDLIST_URL_SCRABBLE, WORDLEN)
-
-
-def download_common_ordered_words() -> dict:
-    ordered_words = download_wordlist(WORDLIST_URL_ORDERED_BY_USAGE, WORDLEN)
-    usageranks = {word: rank for rank, word in enumerate(ordered_words, 1)}
-    return usageranks
 
 
 if __name__=='__main__':
