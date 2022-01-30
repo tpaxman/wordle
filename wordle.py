@@ -5,7 +5,6 @@ from functools import partial
 from itertools import product
 from typing import Callable
 
-WORDLEN = 5
 WORDLIST_URL_SCRABBLE = "https://raw.githubusercontent.com/raun/Scrabble/master/words.txt"
 WORDLIST_URL_COMMON = "https://raw.githubusercontent.com/first20hours/google-10000-english/master/google-10000-english-usa-no-swears-medium.txt"
 CHARS = "abcdefghijklmnopqrstuvwxyz"
@@ -14,10 +13,11 @@ MARKS = {"GREEN", "YELLOW", "GREY"}
 
 def main():
     guess, answer = sys.argv[1:]
-    scrabblewords = download_wordlist(WORDLIST_URL_SCRABBLE, WORDLEN)
-    mostcommon_ordered = download_wordlist(WORDLIST_URL_COMMON, WORDLEN)
+    wordlength = len(answer)
+    assert len(guess) == wordlength, "guess and answer must both be the same length"
 
-    assert set(map(len, (guess, answer))) == {WORDLEN}, "guess and answer must be five-letter words"
+    scrabblewords = download_wordlist(WORDLIST_URL_SCRABBLE, wordlength)
+    mostcommon_ordered = download_wordlist(WORDLIST_URL_COMMON, wordlength)
 
     wordle_sim_scrabble = partial(simulate_wordle, words=scrabblewords)
 
@@ -28,13 +28,11 @@ def main():
     wordle_sim_scrabble(guess, answer, rankwords=partial(order_by_usage_frequency, mostcommon_ordered=mostcommon_ordered))
 
 
-def download_wordlist(url: str, wordlen: int=None) -> list:
+def download_wordlist(url: str, wordlen: int) -> list:
     rawtext = requests.get(url).text
-    wordlist = [x.lower().strip() for x in rawtext.split('\n')]
-    if wordlen:
-        return [w for w in wordlist if len(w)==wordlen]
-    else:
-        return wordlist
+    wordlist = [w.lower().strip() for w in rawtext.split('\n') if len(w)==wordlen]
+    return wordlist
+
 
 def simulate_wordle(guess: str, answer: str, words: set, rankwords: Callable, guessnum: int=1) -> dict:
     mark = get_mark(guess, answer)
@@ -51,7 +49,7 @@ def simulate_wordle(guess: str, answer: str, words: set, rankwords: Callable, gu
 def get_allowed_words(words: set, guess: str, mark: list) -> set:
     charcount_constraints = calc_charcount_constraints(guess, mark)
     position_constraints = calc_position_constraints(guess, mark)
-    return [word for word in words if is_word_allowed(word, charcount_constraints, position_constraints)]
+    return [w for w in words if is_word_allowed(w, charcount_constraints, position_constraints)]
 
 
 def calc_charcount_constraints(guess: str, mark: list) -> dict:
@@ -62,7 +60,7 @@ def calc_charcount_constraints(guess: str, mark: list) -> dict:
     def get_allowed_charcounts(char: str) -> set:
         n_guessed = instances_guessed[char]
         n_confirmed = instances_confirmed[char]
-        n_maxpossible = n_confirmed if n_guessed > n_confirmed else WORDLEN
+        n_maxpossible = n_confirmed if n_guessed > n_confirmed else len(guess)
         return set(range(n_confirmed, n_maxpossible+1))
 
     return {char: get_allowed_charcounts(char) for char in set(guess)}
@@ -74,7 +72,7 @@ def calc_position_constraints(guess: str, mark: list) -> dict:
         set_operation = 'intersection' if mark[position]=="GREEN" else 'difference'
         return getattr(set(CHARS), set_operation)(guess[position])
 
-    return {position: get_allowed_positions(position) for position in range(WORDLEN)}
+    return {position: get_allowed_positions(position) for position in range(len(guess))}
 
 
 def is_word_allowed(word: str, charcount_constraints: dict, position_constraints: dict) -> bool:
@@ -89,7 +87,7 @@ def get_mark(guess: str, answer: str) -> str:
     """returns a mark for a wordle guess where G = green, Y = yellow, N = grey"""
     partialmark = ["GREEN" if g == a else "GREY" if g not in answer else "_"
                    for g, a in zip(guess, answer)]
-    mark_permutations = set(product(MARKS, repeat=WORDLEN))
+    mark_permutations = set(product(MARKS, repeat=len(guess)))
     candidate_marks = {m for m in mark_permutations
         if {('GREEN','GREEN'),('GREY','GREY'),('_','GREY'),('_','YELLOW')}.issuperset(zip(partialmark, m))
     }
@@ -98,9 +96,12 @@ def get_mark(guess: str, answer: str) -> str:
 
 
 def order_by_position_likelihood(words: set) -> list:
+    unique_wordlengths = list(set(map(len, words)))
+    assert len(unique_wordlengths)==1, "all words must have the same length"
+    wordlength = unique_wordlengths[0]
     position_likelihoods = {
         (pos, char): [w[pos] for w in words].count(char) / len(words)
-        for pos in range(WORDLEN) for char in CHARS
+        for pos in range(wordlength) for char in CHARS
     }
     word_scores = {
         w: sum(position_likelihoods.get(k,0) for k in enumerate(w))
