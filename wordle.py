@@ -6,7 +6,7 @@ from itertools import product
 from typing import Callable
 
 WORDLIST_URL_SCRABBLE = "https://raw.githubusercontent.com/raun/Scrabble/master/words.txt"
-WORDLIST_URL_COMMON = "https://raw.githubusercontent.com/first20hours/google-10000-english/master/google-10000-english-usa-no-swears-medium.txt"
+WORDLIST_URL_COMMON = "https://raw.githubusercontent.com/first20hours/google-10000-english/master/google-10000-english-usa-no-swears.txt"
 CHARS = "abcdefghijklmnopqrstuvwxyz"
 MARKS = {"GREEN", "YELLOW", "GREY"}
 
@@ -22,10 +22,10 @@ def main():
     wordle_sim_scrabble = partial(simulate_wordle, words=scrabblewords)
 
     print('\nusing character position likelihood:')
-    wordle_sim_scrabble(guess, answer, rankwords=order_by_position_likelihood)
+    simulate_wordle(guess, answer, scrabblewords, order_by_position_likelihood)
 
     print('\nusing word usage frequency:')
-    wordle_sim_scrabble(guess, answer, rankwords=partial(order_by_usage_frequency, mostcommon_ordered=mostcommon_ordered))
+    simulate_wordle(guess, answer, scrabblewords, partial(order_by_usage_frequency, mostcommon_ordered=mostcommon_ordered))
 
 
 def download_wordlist(url: str, wordlen: int) -> list:
@@ -112,7 +112,7 @@ def order_by_position_likelihood(words: set) -> list:
 
 
 def order_by_usage_frequency(words: set, mostcommon_ordered: list) -> list:
-    mostcommonranks = dict(enumerate(mostcommon_ordered))
+    mostcommonranks = {word: rank for rank, word in enumerate(mostcommon_ordered)}
     return sorted(words, key=lambda x: mostcommonranks.get(x, 1e11))
 
 
