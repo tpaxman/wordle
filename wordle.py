@@ -12,7 +12,7 @@ MARKS = {"GREEN", "YELLOW", "GREY"}
 
 
 def main():
-    guess, answer = sys.argv[1:]
+    answer, guess = sys.argv[1:]
     wordlength = len(answer)
     assert len(guess) == wordlength, "guess and answer must both be the same length"
 
