@@ -40,12 +40,12 @@ def simulate_wordle(guess: str, answer: str, words: set, guess_ranker: Callable,
     allowed_words = get_allowed_words(words, guess, mark)
     ranked_words = guess_ranker(allowed_words)
     print(guessnum, guess, len(ranked_words), ranked_words[:10])
-
-    next_guess = ranked_words[0]
-    if next_guess == answer:
-        print(guessnum+1, next_guess)
+    guessnum = guessnum + 1
+    nextguess = ranked_words[0]
+    if nextguess == answer:
+        print(guessnum, nextguess)
     else:
-        return simulate_wordle(next_guess, answer, ranked_words, guess_ranker, guessnum+1)
+        return simulate_wordle(nextguess, answer, ranked_words, guess_ranker, guessnum)
 
 
 def get_allowed_words(words: set, guess: str, mark: list) -> set:
