@@ -89,16 +89,16 @@ def order_by_usage_frequency(words: set, frequencies: dict) -> list:
     return sorted(words, key=lambda x: frequencies.get(x, 1e11))
 
 
-def simulate_wordle(guess: str, answer: str, words: set, guess_ranker: Callable) -> dict:
+def simulate_wordle(guess: str, answer: str, words: set, guess_ranker: Callable, guessnum: int=1) -> dict:
     mark = get_mark(guess, answer)
     allowed_words = get_allowed_words(words, guess, mark)
     ranked_words = guess_ranker(allowed_words)
     next_guess = ranked_words[0]
-    print(guess, len(ranked_words), ranked_words[:10])
+    print(guessnum, guess, len(ranked_words), ranked_words[:10])
     if next_guess == answer:
-        print(next_guess)
+        print(guessnum+1, next_guess)
     else:
-        return simulate_wordle(next_guess, answer, ranked_words, guess_ranker)
+        return simulate_wordle(next_guess, answer, ranked_words, guess_ranker, guessnum+1)
 
 
 def download_wordlist(url: str, wordlen: int) -> list:
