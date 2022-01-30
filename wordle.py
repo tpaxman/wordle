@@ -5,46 +5,43 @@ from functools import partial
 from itertools import product
 from typing import Callable
 
-# CONSTANTS
 WORDLEN = 5
 WORDLIST_URL_SCRABBLE = "https://raw.githubusercontent.com/raun/Scrabble/master/words.txt"
-WORDLIST_URL_ORDERED_BY_USAGE = "https://raw.githubusercontent.com/first20hours/google-10000-english/master/google-10000-english-usa-no-swears-medium.txt"
+WORDLIST_URL_COMMON = "https://raw.githubusercontent.com/first20hours/google-10000-english/master/google-10000-english-usa-no-swears-medium.txt"
 CHARS = "abcdefghijklmnopqrstuvwxyz"
 MARKS = {"GREEN", "YELLOW", "GREY"}
 
+
 def main():
     guess, answer = sys.argv[1:]
+    scrabblewords = download_wordlist(WORDLIST_URL_SCRABBLE, WORDLEN)
+    mostcommon_ordered = download_wordlist(WORDLIST_URL_COMMON, WORDLEN)
+
     assert set(map(len, (guess, answer))) == {WORDLEN}, "guess and answer must be five-letter words"
-    wordle_sim_scrabble = partial(simulate_wordle, words=download_scrabble_words())
+
+    wordle_sim_scrabble = partial(simulate_wordle, words=scrabblewords)
     print('\nusing character position likelihood:')
     wordle_sim_scrabble(guess, answer, guess_ranker=order_by_position_likelihood)
     print('\nusing word usage frequency:')
-    wordle_sim_scrabble(guess, answer, guess_ranker=partial(order_by_usage_frequency, frequencies=download_common_ordered_words()))
+    wordle_sim_scrabble(guess, answer, guess_ranker=partial(order_by_usage_frequency, mostcommon_ordered=mostcommon_ordered))
 
 
-def download_wordlist(url: str, wordlen: int, casefunction: Callable=str.lower) -> list:
+def download_wordlist(url: str, wordlen: int=None) -> list:
     rawtext = requests.get(url).text
-    textcased = casefunction(rawtext)
-    wordlist = [x.strip() for x in textcased.split('\n') if len(x)==wordlen]
-    return wordlist
-
-
-def download_scrabble_words() -> list:
-    return download_wordlist(WORDLIST_URL_SCRABBLE, WORDLEN)
-
-
-def download_common_ordered_words() -> dict:
-    ordered_words = download_wordlist(WORDLIST_URL_ORDERED_BY_USAGE, WORDLEN)
-    usageranks = {word: rank for rank, word in enumerate(ordered_words, 1)}
-    return usageranks
+    wordlist = [x.lower().strip() for x in rawtext.split('\n')]
+    if wordlen:
+        return [w for w in wordlist if len(w)==wordlen]
+    else:
+        return wordlist
 
 
 def simulate_wordle(guess: str, answer: str, words: set, guess_ranker: Callable, guessnum: int=1) -> dict:
     mark = get_mark(guess, answer)
     allowed_words = get_allowed_words(words, guess, mark)
     ranked_words = guess_ranker(allowed_words)
-    next_guess = ranked_words[0]
     print(guessnum, guess, len(ranked_words), ranked_words[:10])
+
+    next_guess = ranked_words[0]
     if next_guess == answer:
         print(guessnum+1, next_guess)
     else:
@@ -73,13 +70,11 @@ def calc_charcount_constraints(guess: str, mark: list) -> dict:
 
 def calc_position_constraints(guess: str, mark: list) -> dict:
 
-    def possible_position_chars(position: int) -> set:
+    def get_allowed_positions(position: int) -> set:
         set_operation = 'intersection' if mark[position]=="GREEN" else 'difference'
-        set_method = getattr(set(CHARS), set_operation)
-        return set_method(guess[position])
+        return getattr(set(CHARS), set_operation)(guess[position])
 
-    return {position: possible_position_chars(position)
-            for position in range(WORDLEN)}
+    return {position: get_allowed_positions(position) for position in range(WORDLEN)}
 
 
 def is_word_allowed(word: str, charcount_constraints: dict, position_constraints: dict) -> bool:
@@ -115,11 +110,9 @@ def order_by_position_likelihood(words: set) -> list:
     return ordered_words
 
 
-def order_by_usage_frequency(words: set, frequencies: dict) -> list:
-    return sorted(words, key=lambda x: frequencies.get(x, 1e11))
-
-
-
+def order_by_usage_frequency(words: set, mostcommon_ordered: list) -> list:
+    mostcommonranks = {word: rank for rank, word in enumerate(mostcommon_ordered, 1)}
+    return sorted(words, key=lambda x: mostcommonranks.get(x, 1e11))
 
 
 if __name__=='__main__':
