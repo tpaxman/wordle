@@ -1,3 +1,36 @@
+"""
+WORDLE SIMULATOR
+
+This is a script for simulating a wordle solution based on an answer and initial guess.
+
+Run from the command line as follows:
+
+`python wordle.py <answer> <guess>`
+
+where the answer is the correct word for a given wordle game and the guess is the initial attempt. 
+
+
+The simulator checks the guess against the answer to generate a 'mark', which is a list of colors 
+corresponding to each character in the guess:
+- "GREEN" for a character in the correct position
+- "YELLOW" for a character in the word but not at that position
+- "GREY" for a character not in the word
+
+The mark is used to compare against a set of all five letter words (taken from a list of all scrabble words)
+to generate a subset of all "possible" answers based on the mark.
+
+This set of possible words is then ordered by rank, based on either of the following criteria (both are displayed):
+- Highest "positional likelihood score" which is a measure of how common each character is at each position
+within the set of possible words
+- Most commonly used based on an analysis of n-grams
+
+The first item in the "ranked" list is chosen as the next guess and the process repeats until the actual
+answer is guessed.
+
+Currently, the output is just a display of each step with its guess, the number of resulting possible words
+and a preview of the ranked list of words, shown for each method of ranking 
+"""
+
 import sys
 import requests
 from collections import Counter
@@ -12,31 +45,34 @@ MARKS = {"GREEN", "YELLOW", "GREY"}
 
 
 def main():
-    answer, guess = sys.argv[1:]
+
+    # Read answer and guess inputs from command line
+    answer, guess = (x.lower() for x in sys.argv[1:])
     wordlength = len(answer)
     assert len(guess) == wordlength, "guess and answer must both be the same length"
 
+    # import word lists
     scrabblewords = download_wordlist(WORDLIST_URL_SCRABBLE, wordlength)
     mostcommon_ordered = download_wordlist(WORDLIST_URL_COMMON, wordlength)
 
-    wordle_sim_scrabble = partial(simulate_wordle, words=scrabblewords)
-
+    # simulate a recursive wordle solutions
     print('\nusing character position likelihood:')
     simulate_wordle(guess, answer, scrabblewords, order_by_position_likelihood)
-
     print('\nusing word usage frequency:')
     simulate_wordle(guess, answer, scrabblewords, partial(order_by_usage_frequency, mostcommon_ordered=mostcommon_ordered))
 
 
 def download_wordlist(url: str, wordlen: int) -> list:
+    """download words from raw text file at url"""
     rawtext = requests.get(url).text
     wordlist = [w.lower().strip() for w in rawtext.split('\n') if len(w)==wordlen]
     return wordlist
 
 
 def simulate_wordle(guess: str, answer: str, words: set, rankwords: Callable, guessnum: int=1) -> dict:
+    """run a recursive simulation using a function to choose each successive guess"""
     mark = get_mark(guess, answer)
-    words = rankwords(get_allowed_words(words, guess, mark))
+    words = rankwords(get_possible_words(words, guess, mark))
     print(guessnum, guess, len(words), ', '.join(words[:15]))
     guessnum = guessnum + 1
     guess = words[0]
@@ -46,36 +82,49 @@ def simulate_wordle(guess: str, answer: str, words: set, rankwords: Callable, gu
         return simulate_wordle(guess, answer, words, rankwords, guessnum)
 
 
-def get_allowed_words(words: set, guess: str, mark: list) -> set:
+def get_possible_words(words: set, guess: str, mark: list) -> set:
+    """get set of possible words based on an initial set of words, a wordle guess, and its mark"""
     charcount_constraints = calc_charcount_constraints(guess, mark)
     position_constraints = calc_position_constraints(guess, mark)
-    return [w for w in words if is_word_allowed(w, charcount_constraints, position_constraints)]
+    return [w for w in words if is_word_possible(w, charcount_constraints, position_constraints)]
 
 
 def calc_charcount_constraints(guess: str, mark: list) -> dict:
-
+    """
+    get a dict of possible numbers of characters in the word based on the guess and mark
+    e.g. the result {"a": {2,3,4,5}, "d": {1}, "n": {0}} 
+    means only words containing between 2 and 5 "a", 1 "d" and no "n" characters are possible
+    """
     instances_guessed = Counter(guess)   
     instances_confirmed = Counter(g for g, m in zip(guess, mark) if m != "GREY")
     
-    def get_allowed_charcounts(char: str) -> set:
+    def get_possible_charcounts(char: str) -> set:
         n_guessed = instances_guessed[char]
         n_confirmed = instances_confirmed[char]
         n_maxpossible = n_confirmed if n_guessed > n_confirmed else len(guess)
         return set(range(n_confirmed, n_maxpossible+1))
 
-    return {char: get_allowed_charcounts(char) for char in set(guess)}
+    return {char: get_possible_charcounts(char) for char in set(guess)}
 
 
 def calc_position_constraints(guess: str, mark: list) -> dict:
-
-    def get_allowed_positions(position: int) -> set:
+    """
+    get a dict of possible characters at each position in the word based on the guess and mark
+    e.g. the result {0: {"a", "b", "d", "e", ..., "z"}, 1: {"a"}, 2: {"g"}, 3: {"b", "c", ...}...}
+    means that the first character can be anything but "c", the second is "a", the third is "g"
+    and so on.
+    """
+    def get_possible_positions(position: int) -> set:
         set_operation = 'intersection' if mark[position]=="GREEN" else 'difference'
         return getattr(set(CHARS), set_operation)(guess[position])
 
-    return {position: get_allowed_positions(position) for position in range(len(guess))}
+    return {position: get_possible_positions(position) for position in range(len(guess))}
 
 
-def is_word_allowed(word: str, charcount_constraints: dict, position_constraints: dict) -> bool:
+def is_word_possible(word: str, charcount_constraints: dict, position_constraints: dict) -> bool:
+    """
+    checks if word is possible based on the possible character counts and position characters
+    """
     instances = Counter(word)
     return all((
         all(instances[c] in n for c, n in charcount_constraints.items()),
@@ -84,18 +133,28 @@ def is_word_allowed(word: str, charcount_constraints: dict, position_constraints
 
 
 def get_mark(guess: str, answer: str) -> str:
-    """returns a mark for a wordle guess where G = green, Y = yellow, N = grey"""
+    """
+    returns a mark for a wordle guess as a list of 5 colors, either 
+    green, grey, or yellow to denote the mark given to the guess
+    e.g. a mark could be ["GREEN", "GREY", "GREY", "YELLOW", "GREY"] 
+    
+    """
     partialmark = ["GREEN" if g == a else "GREY" if g not in answer else "_"
                    for g, a in zip(guess, answer)]
     mark_permutations = set(product(MARKS, repeat=len(guess)))
     candidate_marks = {m for m in mark_permutations
         if {('GREEN','GREEN'),('GREY','GREY'),('_','GREY'),('_','YELLOW')}.issuperset(zip(partialmark, m))
     }
-    ok_marks = [mark for mark in candidate_marks if answer in get_allowed_words({answer}, guess, mark)]
+    ok_marks = [mark for mark in candidate_marks if answer in get_possible_words({answer}, guess, mark)]
     return ok_marks[0] # there can sometimes be more than one possible mark
 
 
 def order_by_position_likelihood(words: set) -> list:
+    """
+    order a set of words by highest "position likelihood score", i.e. where the frequencies
+    of each character at each position are calculated based on the total set of possible
+    words and are summed to give a score measure.
+    """
     unique_wordlengths = list(set(map(len, words)))
     assert len(unique_wordlengths)==1, "all words must have the same length"
     wordlength = unique_wordlengths[0]
@@ -112,6 +171,11 @@ def order_by_position_likelihood(words: set) -> list:
 
 
 def order_by_usage_frequency(words: set, mostcommon_ordered: list) -> list:
+    """
+    orders a set of words by most commonly used words according to a list given by
+    mostcommon_ordered. If the word in the set does not occur in the list of ordered
+    words, it is assigned an arbitrarily low ranking
+    """
     mostcommonranks = {word: rank for rank, word in enumerate(mostcommon_ordered)}
     return sorted(words, key=lambda x: mostcommonranks.get(x, 1e11))
 
