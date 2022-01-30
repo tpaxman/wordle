@@ -22,11 +22,10 @@ def main():
     wordle_sim_scrabble(guess, answer, guess_ranker=partial(order_by_usage_frequency, frequencies=download_common_ordered_words()))
 
 
-def download_wordlist(url: str, wordlen: int) -> list:
-    response = requests.get(url)
-    rawtext = response.text
-    lowertext = rawtext.lower()
-    wordlist = [x.strip() for x in lowertext.split('\n') if len(x)==wordlen]
+def download_wordlist(url: str, wordlen: int, casefunction: Callable=str.lower) -> list:
+    rawtext = requests.get(url).text
+    textcased = casefunction(rawtext)
+    wordlist = [x.strip() for x in textcased.split('\n') if len(x)==wordlen]
     return wordlist
 
 
