@@ -2,33 +2,41 @@
 WORDLE SIMULATOR
 
 This is a script for simulating a wordle solution based on an answer and initial guess.
-
-Run from the command line as follows:
+It can be run from the command line as follows:
 
 `python wordle.py <answer> <guess>`
 
-where the answer is the correct word for a given wordle game and the guess is the initial attempt. 
+
+Terminology:
+
+- "answer": the five-letter answer to the wordle puzzle (i.e. target word)
+- "guess": a five-letter word that is submitted as a guess at the answer
+- "result": the colors assigned to a guessed word giving info about each letter (GREEN, YELLOW, or GREY) 
 
 
-The simulator checks the guess against the answer to generate a 'result', which is a list of colors 
-corresponding to each character in the guess:
-- "GREEN" for a character in the correct position
-- "YELLOW" for a character in the word but not at that position
-- "GREY" for a character not in the word
+Process:
 
-The result is used to compare against a set of all five letter words (taken from a list of all scrabble words)
-to generate a subset of all "possible" answers based on the result.
+- The script requires the 'answer' and initial 'guess' in input arguments.
+- The guess is checked against the answer to generate a 'result' consisting of a
+5 element combination of any of the following colors:
+    - "GREEN" for a character in the correct position
+    - "YELLOW" for a character in the word but not at that position
+    - "GREY" for a character not in the word
+- A set of all five-letter words is filtered down to a subset of possible answers based
+on the result of the guess. (The words are taken from the Scrabble dictionary)
+- This set of possible words is then ordered by rank based on either of the following criteria:
 
-This set of possible words is then ordered by rank, based on either of the following criteria (both are displayed):
-- Highest "positional likelihood score" which is a measure of how common each character is at each position
-within the set of possible words
-- Most commonly used based on an analysis of n-grams
+    1. Highest "positional likelihood score" which is a measure of how common each character is at each position
+    within the set of possible words
 
-The first item in the "ranked" list is chosen as the next guess and the process repeats until the actual
+    2. Most commonly used based on an analysis of n-grams
+
+- The first item in the "ranked" list is chosen as the next guess and the process repeats until the actual
 answer is guessed.
 
-Currently, the output is just a display of each step with its guess, the number of resulting possible words
-and a preview of the ranked list of words, shown for each method of ranking 
+- The output at each step consists of the guess, the number of resulting possible words
+and a preview of the ranked list of words. This is shown for each of the two ranking methods
+described above.
 """
 
 import sys
@@ -99,6 +107,7 @@ def calc_charcount_constraints(guess: str, result: list) -> dict:
     instances_confirmed = Counter(g for g, m in zip(guess, result) if m != "GREY")
     
     def get_possible_charcounts(char: str) -> set:
+        """get set of all possible numbers of letters in the word"""
         n_guessed = instances_guessed[char]
         n_confirmed = instances_confirmed[char]
         n_maxpossible = n_confirmed if n_guessed > n_confirmed else len(guess)
@@ -115,6 +124,7 @@ def calc_position_constraints(guess: str, result: list) -> dict:
     and so on.
     """
     def get_possible_positions(position: int) -> set:
+        """get set of possible characters in a specified position"""
         set_operation = 'intersection' if result[position]=="GREEN" else 'difference'
         return getattr(set(CHARS), set_operation)(guess[position])
 
@@ -123,7 +133,7 @@ def calc_position_constraints(guess: str, result: list) -> dict:
 
 def is_word_possible(word: str, charcount_constraints: dict, position_constraints: dict) -> bool:
     """
-    checks if word is possible based on the possible character counts and position characters
+    check if word is possible based on the possible character counts and position characters
     """
     instances = Counter(word)
     return all((
@@ -137,7 +147,6 @@ def get_result(guess: str, answer: str) -> str:
     returns a result for a wordle guess as a list of 5 colors, either 
     green, grey, or yellow to denote the result given to the guess
     e.g. a result could be ["GREEN", "GREY", "GREY", "YELLOW", "GREY"] 
-    
     """
     partialresult = ["GREEN" if g == a else "GREY" if g not in answer else "_"
                    for g, a in zip(guess, answer)]
