@@ -1,11 +1,11 @@
 # WORDLE SIMULATOR
 
-This is a script for simulating a Wordle solution based on an answer and initial guess.
+This is a script for simulating a Wordle solution based on an answer and an (optional) initial guess.
 It can be run from the command line as follows:
 
 
 ```
-python wordle.py <answer> <guess>
+python wordle.py <answer> -g <guess>
 ```
 
 ## Terminology:
@@ -17,7 +17,8 @@ python wordle.py <answer> <guess>
 
 ## Process Steps:
 
-- The script requires the 'answer' and initial 'guess' in input arguments.
+- The script requires the 'answer' and optionally takes an initial 'guess' in input arguments.
+- If no initial guess is provided, default values are obtained via the 'next guess' models described below.
 - The guess is checked against the answer to generate a 'result' consisting of a
 5 element combination of any of the following colors:
     - "GREEN" for a character in the correct position

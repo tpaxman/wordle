@@ -3,11 +3,11 @@ WORDLE SIMULATOR
 
 This is a script for simulating a wordle solution based on an answer and initial guess and can be run from the command line as follows:
 
-`python wordle.py <answer> <guess>`
+`python wordle.py <answer> -g <guess>`
 """
 
-import sys
 import requests
+import argparse
 from collections import Counter
 from functools import partial
 from itertools import product
@@ -22,9 +22,16 @@ MARKS = {"GREEN", "YELLOW", "GREY"}
 def main():
 
     # Read answer and guess inputs from command line
-    answer, guess = (x.lower() for x in sys.argv[1:])
+    parser = argparse.ArgumentParser(description='get Wordle answer and guess from command line')
+    parser.add_argument('answer', metavar='a', type=str.lower, help='answer to the Wordle puzzle (5 letter word)')
+    parser.add_argument('-g', '--guess', metavar='g', type=str.lower, default=None, help='initial guess to the puzzle')
+    args = parser.parse_args()
+
+    # extract command line arguments
+    answer = args.answer
+    guess = args.guess
+
     wordlength = len(answer)
-    assert len(guess) == wordlength, "guess and answer must both be the same length"
 
     # import word lists
     scrabblewords = download_wordlist(WORDLIST_URL_SCRABBLE, wordlength)
@@ -32,9 +39,15 @@ def main():
 
     # simulate a recursive wordle solutions
     print('\nusing character position likelihood:')
-    simulate_wordle(guess, answer, scrabblewords, order_by_position_likelihood)
+    guess1 = guess if guess else order_by_position_likelihood(scrabblewords)[0]
+    print(f'\ninitial guess: {guess1}')
+    simulate_wordle(guess1, answer, scrabblewords, order_by_position_likelihood)
+
     print('\nusing word usage frequency:')
-    simulate_wordle(guess, answer, scrabblewords, partial(order_by_usage_frequency, mostcommon_ordered=mostcommon_ordered))
+    orderbyusage = partial(order_by_usage_frequency, mostcommon_ordered=mostcommon_ordered)
+    guess2 = guess if guess else orderbyusage(scrabblewords)[0]
+    print(f'\ninitial guess: {guess2}')
+    simulate_wordle(guess2, answer, scrabblewords, orderbyusage) 
 
 
 def download_wordlist(url: str, wordlen: int) -> list:
