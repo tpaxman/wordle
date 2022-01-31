@@ -10,14 +10,14 @@ Run from the command line as follows:
 where the answer is the correct word for a given wordle game and the guess is the initial attempt. 
 
 
-The simulator checks the guess against the answer to generate a 'mark', which is a list of colors 
+The simulator checks the guess against the answer to generate a 'result', which is a list of colors 
 corresponding to each character in the guess:
 - "GREEN" for a character in the correct position
 - "YELLOW" for a character in the word but not at that position
 - "GREY" for a character not in the word
 
-The mark is used to compare against a set of all five letter words (taken from a list of all scrabble words)
-to generate a subset of all "possible" answers based on the mark.
+The result is used to compare against a set of all five letter words (taken from a list of all scrabble words)
+to generate a subset of all "possible" answers based on the result.
 
 This set of possible words is then ordered by rank, based on either of the following criteria (both are displayed):
 - Highest "positional likelihood score" which is a measure of how common each character is at each position
@@ -71,32 +71,32 @@ def download_wordlist(url: str, wordlen: int) -> list:
 
 def simulate_wordle(guess: str, answer: str, words: set, rankwords: Callable, guessnum: int=1) -> dict:
     """run a recursive simulation using a function to choose each successive guess"""
-    mark = get_mark(guess, answer)
-    words = rankwords(get_possible_words(words, guess, mark))
+    result = get_result(guess, answer)
+    words = rankwords(get_possible_words(words, guess, result))
     print(guessnum, guess, len(words), ', '.join(words[:15]))
     guessnum = guessnum + 1
     guess = words[0]
     if guess == answer:
         print(guessnum, guess)
     else:
-        return simulate_wordle(guess, answer, words, rankwords, guessnum)
+        simulate_wordle(guess, answer, words, rankwords, guessnum)
 
 
-def get_possible_words(words: set, guess: str, mark: list) -> set:
-    """get set of possible words based on an initial set of words, a wordle guess, and its mark"""
-    charcount_constraints = calc_charcount_constraints(guess, mark)
-    position_constraints = calc_position_constraints(guess, mark)
+def get_possible_words(words: set, guess: str, result: list) -> set:
+    """get set of possible words based on an initial set of words, a wordle guess, and its result"""
+    charcount_constraints = calc_charcount_constraints(guess, result)
+    position_constraints = calc_position_constraints(guess, result)
     return [w for w in words if is_word_possible(w, charcount_constraints, position_constraints)]
 
 
-def calc_charcount_constraints(guess: str, mark: list) -> dict:
+def calc_charcount_constraints(guess: str, result: list) -> dict:
     """
-    get a dict of possible numbers of characters in the word based on the guess and mark
+    get a dict of possible numbers of characters in the word based on the guess and result
     e.g. the result {"a": {2,3,4,5}, "d": {1}, "n": {0}} 
     means only words containing between 2 and 5 "a", 1 "d" and no "n" characters are possible
     """
     instances_guessed = Counter(guess)   
-    instances_confirmed = Counter(g for g, m in zip(guess, mark) if m != "GREY")
+    instances_confirmed = Counter(g for g, m in zip(guess, result) if m != "GREY")
     
     def get_possible_charcounts(char: str) -> set:
         n_guessed = instances_guessed[char]
@@ -107,15 +107,15 @@ def calc_charcount_constraints(guess: str, mark: list) -> dict:
     return {char: get_possible_charcounts(char) for char in set(guess)}
 
 
-def calc_position_constraints(guess: str, mark: list) -> dict:
+def calc_position_constraints(guess: str, result: list) -> dict:
     """
-    get a dict of possible characters at each position in the word based on the guess and mark
+    get a dict of possible characters at each position in the word based on the guess and result
     e.g. the result {0: {"a", "b", "d", "e", ..., "z"}, 1: {"a"}, 2: {"g"}, 3: {"b", "c", ...}...}
     means that the first character can be anything but "c", the second is "a", the third is "g"
     and so on.
     """
     def get_possible_positions(position: int) -> set:
-        set_operation = 'intersection' if mark[position]=="GREEN" else 'difference'
+        set_operation = 'intersection' if result[position]=="GREEN" else 'difference'
         return getattr(set(CHARS), set_operation)(guess[position])
 
     return {position: get_possible_positions(position) for position in range(len(guess))}
@@ -132,21 +132,21 @@ def is_word_possible(word: str, charcount_constraints: dict, position_constraint
     ))
 
 
-def get_mark(guess: str, answer: str) -> str:
+def get_result(guess: str, answer: str) -> str:
     """
-    returns a mark for a wordle guess as a list of 5 colors, either 
-    green, grey, or yellow to denote the mark given to the guess
-    e.g. a mark could be ["GREEN", "GREY", "GREY", "YELLOW", "GREY"] 
+    returns a result for a wordle guess as a list of 5 colors, either 
+    green, grey, or yellow to denote the result given to the guess
+    e.g. a result could be ["GREEN", "GREY", "GREY", "YELLOW", "GREY"] 
     
     """
-    partialmark = ["GREEN" if g == a else "GREY" if g not in answer else "_"
+    partialresult = ["GREEN" if g == a else "GREY" if g not in answer else "_"
                    for g, a in zip(guess, answer)]
-    mark_permutations = set(product(MARKS, repeat=len(guess)))
-    candidate_marks = {m for m in mark_permutations
-        if {('GREEN','GREEN'),('GREY','GREY'),('_','GREY'),('_','YELLOW')}.issuperset(zip(partialmark, m))
+    result_permutations = set(product(MARKS, repeat=len(guess)))
+    candidate_results = {m for m in result_permutations
+        if {('GREEN','GREEN'),('GREY','GREY'),('_','GREY'),('_','YELLOW')}.issuperset(zip(partialresult, m))
     }
-    ok_marks = [mark for mark in candidate_marks if answer in get_possible_words({answer}, guess, mark)]
-    return ok_marks[0] # there can sometimes be more than one possible mark
+    ok_results = [result for result in candidate_results if answer in get_possible_words({answer}, guess, result)]
+    return ok_results[0] # there can sometimes be more than one possible result
 
 
 def order_by_position_likelihood(words: set) -> list:
