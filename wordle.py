@@ -39,9 +39,9 @@ def main():
 
     # simulate a recursive wordle solutions
     print('\nusing character position likelihood:')
-    guess1 = guess if guess else order_by_position_likelihood(scrabblewords)[0]
+    guess1 = guess if guess else order_by_charposition_likelihood(scrabblewords)[0]
     print(f'\ninitial guess: {guess1}')
-    simulate_wordle(guess1, answer, scrabblewords, order_by_position_likelihood)
+    simulate_wordle(guess1, answer, scrabblewords, order_by_charposition_likelihood)
 
     print('\nusing word usage frequency:')
     orderbyusage = partial(order_by_usage_frequency, mostcommon_ordered=mostcommon_ordered)
@@ -128,31 +128,38 @@ def get_result(guess: str, answer: str) -> str:
     green, grey, or yellow to denote the result given to the guess
     e.g. a result could be ["GREEN", "GREY", "GREY", "YELLOW", "GREY"] 
     """
-    partialresult = ["GREEN" if g == a else "GREY" if g not in answer else "_"
+    # first pass: assign green and grey where possible; leave ambiguous cases as "_"
+    firstpass = ["GREEN" if g == a else "GREY" if g not in answer else "_"
                    for g, a in zip(guess, answer)]
+
+    # use first pass to match with possible result candidate from the set of all permutations
     result_permutations = set(product(MARKS, repeat=len(guess)))
     candidate_results = {m for m in result_permutations
-        if {('GREEN','GREEN'),('GREY','GREY'),('_','GREY'),('_','YELLOW')}.issuperset(zip(partialresult, m))
+        if {('GREEN','GREEN'),('GREY','GREY'),('_','GREY'),('_','YELLOW')}.issuperset(zip(firstpass, m))
     }
+
+    # finally: filter candidate results to those that are consistent with the final answer
     ok_results = [result for result in candidate_results if answer in get_possible_words({answer}, guess, result)]
+
+    # since there can occasionally be more than one valid result, just use the first
     return ok_results[0] # there can sometimes be more than one possible result
 
 
-def order_by_position_likelihood(words: set) -> list:
+def order_by_charposition_likelihood(words: set) -> list:
     """
     order a set of words by highest "position likelihood score", i.e. where the frequencies
     of each character at each position are calculated based on the total set of possible
     words and are summed to give a score measure.
     """
-    unique_wordlengths = list(set(map(len, words)))
-    assert len(unique_wordlengths)==1, "all words must have the same length"
-    wordlength = unique_wordlengths[0]
-    position_likelihoods = {
+    # get a dict of letter instance fractions at each position
+    wordlength = get_wordlength_from_set(words)
+    charposition_likelihoods = {
         (pos, char): [w[pos] for w in words].count(char) / len(words)
         for pos in range(wordlength) for char in CHARS
     }
+    # assume that the word with the highest sum of positional frequencies is best
     word_scores = {
-        w: sum(position_likelihoods.get(k,0) for k in enumerate(w))
+        w: sum(charposition_likelihoods.get(k,0) for k in enumerate(w))
         for w in words
     }
     ordered_words = sorted(words, key=word_scores.get, reverse=True)
@@ -165,8 +172,16 @@ def order_by_usage_frequency(words: set, mostcommon_ordered: list) -> list:
     mostcommon_ordered. If the word in the set does not occur in the list of ordered
     words, it is assigned an arbitrarily low ranking
     """
+    assert len(set(map(get_wordlength_from_set, [words, mostcommon_ordered]))), "all words must have same length"
     mostcommonranks = {word: rank for rank, word in enumerate(mostcommon_ordered)}
     return sorted(words, key=lambda x: mostcommonranks.get(x, 1e11))
+
+
+def get_wordlength_from_set(words: set) -> int:
+    unique_wordlengths = list(set(map(len, words)))
+    assert len(unique_wordlengths)==1, "all words must have the same length"
+    wordlength = unique_wordlengths[0]
+    return wordlength
 
 
 if __name__=='__main__':
