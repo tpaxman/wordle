@@ -38,16 +38,14 @@ def main():
     mostcommon_ordered = download_wordlist(WORDLIST_URL_COMMON, wordlength)
 
     # simulate a recursive wordle solutions
+    simulate = partial(simulate_wordle, answer=answer, words=scrabblewords, guess=guess)
+
     print('\nusing character position likelihood:')
-    guess1 = guess if guess else order_by_charposition_likelihood(scrabblewords)[0]
-    print(f'\ninitial guess: {guess1}')
-    simulate_wordle(guess1, answer, scrabblewords, order_by_charposition_likelihood)
+    simulate(rankwords=order_by_charposition_likelihood)
 
     print('\nusing word usage frequency:')
-    orderbyusage = partial(order_by_usage_frequency, mostcommon_ordered=mostcommon_ordered)
-    guess2 = guess if guess else orderbyusage(scrabblewords)[0]
-    print(f'\ninitial guess: {guess2}')
-    simulate_wordle(guess2, answer, scrabblewords, orderbyusage) 
+    simulate(rankwords=partial(order_by_usage_frequency, mostcommon_ordered=mostcommon_ordered))
+             
 
 
 def download_wordlist(url: str, wordlen: int) -> list:
@@ -57,8 +55,9 @@ def download_wordlist(url: str, wordlen: int) -> list:
     return wordlist
 
 
-def simulate_wordle(guess: str, answer: str, words: set, rankwords: Callable, guessnum: int=1) -> dict:
+def simulate_wordle(answer: str, words: set, rankwords: Callable, guess: str=None, guessnum: int=1) -> dict:
     """run a recursive simulation using a function to choose each successive guess"""
+    guess = guess if guess else rankwords(words)[0]
     result = get_result(guess, answer)
     words = rankwords(get_possible_words(words, guess, result))
     print(guessnum, guess, len(words), ', '.join(words[:15]))
@@ -67,7 +66,7 @@ def simulate_wordle(guess: str, answer: str, words: set, rankwords: Callable, gu
     if guess == answer:
         print(guessnum, guess)
     else:
-        simulate_wordle(guess, answer, words, rankwords, guessnum)
+        simulate_wordle(answer=answer, words=words, rankwords=rankwords, guess=guess, guessnum=guessnum)
 
 
 def get_possible_words(words: set, guess: str, result: list) -> set:
