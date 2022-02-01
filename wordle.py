@@ -17,6 +17,7 @@ WORDLIST_URL_SCRABBLE = "https://raw.githubusercontent.com/raun/Scrabble/master/
 WORDLIST_URL_COMMON = "https://raw.githubusercontent.com/first20hours/google-10000-english/master/google-10000-english-usa-no-swears.txt"
 CHARS = "abcdefghijklmnopqrstuvwxyz"
 MARKS = {"GREEN", "YELLOW", "GREY"}
+INCONSISTENT_WORDLEN_MSG = "all words must be the same length"
 
 
 def main():
@@ -31,14 +32,13 @@ def main():
     answer = args.answer
     guess = args.guess
 
-    wordlength = len(answer)
-
     # import word lists
+    wordlength = len(answer)
     scrabblewords = download_wordlist(WORDLIST_URL_SCRABBLE, wordlength)
     mostcommon_ordered = download_wordlist(WORDLIST_URL_COMMON, wordlength)
 
     # simulate a recursive wordle solutions
-    simulate = partial(simulate_wordle, answer=answer, words=scrabblewords, guess=guess)
+    simulate = partial(simulate_wordle, answer=answer, words=set(scrabblewords), guess=guess)
 
     print('\nusing character position likelihood:')
     simulate(rankwords=order_by_charposition_likelihood)
@@ -48,32 +48,37 @@ def main():
              
 
 
-def download_wordlist(url: str, wordlen: int) -> list:
+def download_wordlist(url: str, wordlength: int) -> list:
     """download words from raw text file at url"""
     rawtext = requests.get(url).text
-    wordlist = [w.lower().strip() for w in rawtext.split('\n') if len(w)==wordlen]
+    wordlist = [w.lower().strip() for w in rawtext.split('\n') if len(w)==wordlength]
     return wordlist
 
 
 def simulate_wordle(answer: str, words: set, rankwords: Callable, guess: str=None, guessnum: int=1) -> dict:
     """run a recursive simulation using a function to choose each successive guess"""
+    # assign best guess if no guess is provided 
     guess = guess if guess else rankwords(words)[0]
+    assert all_same_len({guess, answer} & words), INCONSISTENT_WORDLEN_MSG
+
     result = get_result(guess, answer)
-    words = rankwords(get_possible_words(words, guess, result))
-    print(guessnum, guess, len(words), ', '.join(words[:15]))
+    words_possible = get_possible_words(words, guess, result)
+    num_words_possible = len(words_possible)
+    words_ordered = rankwords(words_possible)
+    print(guessnum, guess, num_words_possible, ', '.join(words_ordered[:15]))
     guessnum = guessnum + 1
-    guess = words[0]
     if guess == answer:
-        print(guessnum, guess)
+        print(guessnum, answer)
     else:
-        simulate_wordle(answer=answer, words=words, rankwords=rankwords, guess=guess, guessnum=guessnum)
+        guess = words_ordered[0]
+        simulate_wordle(answer=answer, words=words_possible, rankwords=rankwords, guess=guess, guessnum=guessnum)
 
 
 def get_possible_words(words: set, guess: str, result: list) -> set:
     """get set of possible words based on an initial set of words, a wordle guess, and its result"""
     charcount_constraints = calc_charcount_constraints(guess, result)
     position_constraints = calc_position_constraints(guess, result)
-    return [w for w in words if is_word_possible(w, charcount_constraints, position_constraints)]
+    return {w for w in words if is_word_possible(w, charcount_constraints, position_constraints)}
 
 
 def calc_charcount_constraints(guess: str, result: list) -> dict:
@@ -171,10 +176,15 @@ def order_by_usage_frequency(words: set, mostcommon_ordered: list) -> list:
     mostcommon_ordered. If the word in the set does not occur in the list of ordered
     words, it is assigned an arbitrarily low ranking
     """
-    assert len(set(map(get_wordlength_from_set, [words, mostcommon_ordered]))), "all words must have same length"
+    assert all(map(all_same_len, [words, mostcommon_ordered])), INCONSISTENT_WORDLEN_MSG 
     mostcommonranks = {word: rank for rank, word in enumerate(mostcommon_ordered)}
     return sorted(words, key=lambda x: mostcommonranks.get(x, 1e11))
 
+def wordlengths(words: set) -> set:
+    return set(map(len, words))
+
+def all_same_len(words: set) -> bool:
+    return len(wordlengths(words)) == 1
 
 def get_wordlength_from_set(words: set) -> int:
     unique_wordlengths = list(set(map(len, words)))
